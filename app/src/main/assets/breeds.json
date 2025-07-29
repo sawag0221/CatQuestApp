@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "name": "アメリカンショートヘア",
+    "imageName": "american_shorthair_placeholder"
+  },
+  {
+    "id": 2,
+    "name": "スコティッシュフォールド",
+    "imageName": "scottish_fold_placeholder"
+  },
+  {
+    "id": 3,
+    "name": "ロシアンブルー",
+    "imageName": "russian_blue_placeholder"
+  },
+  {
+    "id": 4,
+    "name": "マンチカン",
+    "imageName": "munchkin_placeholder"
+  },
+  {
+    "id": 5,
+    "name": "三毛様",
+    "imageName": "mikesama_placeholder"
+  }
+]

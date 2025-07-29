@@ -1,0 +1,65 @@
+{
+  "version": 4,
+  "monsters": [
+    {
+      "id": 1,
+      "name": "化け猫",
+      "type": "ねこ",
+      "imageResName": "bakeneko_img",
+      "hp": 30,
+      "attack": 8,
+      "defense": 2,
+      "experience": 5,
+      "gold": 3,
+      "description": "ごく普通のミケねこ。爪と牙で攻撃してくる。"
+    },
+    {
+      "id": 2,
+      "name": "ブラックキャット",
+      "type": "ねこ",
+      "imageResName": "black_cat_img",
+      "hp": 35,
+      "attack": 7,
+      "defense": 3,
+      "experience": 6,
+      "gold": 4,
+      "description": "少し警戒心の強いクロねこ。素早い動きが特徴。"
+    },
+    {
+      "id": 3,
+      "name": "はぐれネズミ",
+      "type": "ねずみ",
+      "imageResName": "mouse_stray_img",
+      "hp": 20,
+      "attack": 5,
+      "defense": 1,
+      "experience": 3,
+      "gold": 2,
+      "description": "群れからはぐれた臆病なネズミ。意外とすばしっこい。"
+    },
+    {
+      "id": 4,
+      "name": "ビッグラット",
+      "type": "ねずみ",
+      "imageResName": "rat_big_img",
+      "hp": 50,
+      "attack": 10,
+      "defense": 4,
+      "experience": 10,
+      "gold": 8,
+      "description": "下水道などに住む大きなネズミ。噛みつき攻撃は強力だ。"
+    },
+    {
+      "id": 5,
+      "name": "トビー",
+      "type": "ムカデ",
+      "imageResName": "tobi_img",
+      "hp": 100,
+      "attack": 20,
+      "defense": 14,
+      "experience": 20,
+      "gold": 18,
+      "description": "強力な毒をもつトビズムカデ。噛みつかれたら離さない！"
+    }
+  ]
+}
