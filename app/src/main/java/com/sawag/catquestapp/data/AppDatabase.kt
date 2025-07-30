@@ -143,6 +143,8 @@ import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.sawag.catquestapp.data.monster.MonsterDao
+import com.sawag.catquestapp.data.monster.MonsterEntity
 // import androidx.sqlite.db.SupportSQLiteDatabase // Callback を使わないので不要
 import com.sawag.catquestapp.data.user.UserDao // ★ UserDao をインポート
 import com.sawag.catquestapp.data.user.UserEntity // ★ UserEntity をインポート
@@ -151,13 +153,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 
 @Database(
-    entities = [UserEntity::class], // UserEntity のみ
-    version = 1,                   // ★ 初期バージョン
+    entities = [UserEntity::class, MonsterEntity::class], // UserEntity のみ
+    version = 2,                   // ★ 初期バージョン
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun userDao(): UserDao
+    abstract fun monsterDao(): MonsterDao
 
     companion object {
         @Volatile
