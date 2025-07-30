@@ -60,6 +60,18 @@
       "experience": 20,
       "gold": 18,
       "description": "強力な毒をもつトビズムカデ。噛みつかれたら離さない！"
+    },
+    {
+      "id": 6,
+      "name": "スライムキャット",
+      "type": "ねこスライム",
+      "imageResName": "slimecat_img",
+      "hp": 50,
+      "attack": 5,
+      "defense": 10,
+      "experience": 8,
+      "gold": 5,
+      "description": "ぷるぷるしたネコ型のスライム。物理攻撃に強い。"
     }
   ]
 }
