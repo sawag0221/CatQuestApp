@@ -92,6 +92,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose) // 最新バージョンを確認してください
     implementation(libs.androidx.foundation) // Compose Foundation のバージョンを確認
     implementation(libs.kotlinx.serialization.json)
+
+    implementation("com.google.code.gson:gson:2.13.1") // 最新バージョンを確認してください
 }
 kotlin
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
