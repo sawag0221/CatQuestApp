@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 import java.io.InputStreamReader
 
 // --- バージョン管理 ---
-private const val CURRENT_DATABASE_VERSION = 6 // ★ 今回上げる新しいバージョン (例: 5から6へ)
-private const val PREVIOUS_VERSION_FOR_MONSTER_REPOPULATION = 5
+private const val CURRENT_DATABASE_VERSION = 7 // ★ 今回上げる新しいバージョン (例: 5から6へ)
+private const val PREVIOUS_VERSION_FOR_MONSTER_REPOPULATION = 6
 
 @Database(
     entities = [UserEntity::class, MonsterEntity::class],
