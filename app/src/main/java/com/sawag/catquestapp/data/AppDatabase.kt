@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
+// import androidx.room.migration.Migration // ★ 一旦不要なのでコメントアウト
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -19,14 +19,13 @@ import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.launch
 import java.io.InputStreamReader
 
-// --- バージョン管理 ---
-private const val CURRENT_DATABASE_VERSION = 7 // ★ 今回上げる新しいバージョン (例: 5から6へ)
-private const val PREVIOUS_VERSION_FOR_MONSTER_REPOPULATION = 6
+// --- データベースの初期バージョン ---
+private const val INITIAL_DATABASE_VERSION = 1 // ★★★ バージョンを1に設定 ★★★
 
 @Database(
     entities = [UserEntity::class, MonsterEntity::class],
-    version = CURRENT_DATABASE_VERSION,
-    exportSchema = true
+    version = INITIAL_DATABASE_VERSION,      // ★★★ バージョンを1に設定 ★★★
+    exportSchema = true // スキーマのエクスポートは有効にしておくのがおすすめです
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
@@ -35,29 +34,37 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
-        private lateinit var applicationContextInternal: Context // ★ Contextを保持するプロパティ
+        private lateinit var applicationContextInternal: Context
 
         private const val TAG = "AppDatabase"
         private const val PREFS_NAME = "db_population_prefs"
         private fun getMonsterDataPopulatedKey(version: Int) = "monster_data_populated_for_v_$version"
 
+        // --- マイグレーション定義 ---
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        // ★ ここにあった MIGRATION_6_7 や MIGRATION_7_8 の定義は一旦削除またはコメントアウト ★
+        // ★ バージョン1から開始するため、初期状態ではマイグレーションは不要です。        ★
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
         fun getDatabase(context: Context, applicationScope: CoroutineScope): AppDatabase {
-            // ★ getDatabaseが呼ばれる際にContextを保持する
-            // synchronizedブロックの外で初期化することで、不要なロック範囲を減らす
             if (!::applicationContextInternal.isInitialized) {
                 applicationContextInternal = context.applicationContext
                 Log.d(TAG, "ApplicationContext initialized in getDatabase.")
             }
             return INSTANCE ?: synchronized(this) {
-                // ダブルチェックロッキングパターン
                 INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext, // ここは builder に渡す Context なので元のままでOK
+                    context.applicationContext,
                     AppDatabase::class.java,
                     "cat_quest_database"
                 )
-                    .addCallback(AppDatabaseCallback(applicationContextInternal, applicationScope)) // ★ Callback にも保持した Context を渡す
-                    .addMigrations(MIGRATION_CLEAR_MONSTERS)
-                    .setQueryCallback(
+                    // ★★★ Callbackには初期バージョンを渡すか、Callback内でdb.versionを参照する設計に依存 ★★★
+                    .addCallback(AppDatabaseCallback(applicationContextInternal, applicationScope, INITIAL_DATABASE_VERSION))
+                    // ★★★ addMigrations() は空にするか、呼び出し自体をコメントアウト ★★★
+                    // .addMigrations(
+                    //     // MIGRATION_6_7_CLEAR_REPOPULATE_MONSTERS,
+                    //     // MIGRATION_7_8_ADD_RARITY_TO_MONSTERS
+                    // )
+                    .setQueryCallback( // クエリログはデバッグに役立つので残してもOK
                         object : QueryCallback {
                             override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
                                 Log.v("RoomQuery", "SQL Query: $sqlQuery SQL Args: $bindArgs")
@@ -65,6 +72,8 @@ abstract class AppDatabase : RoomDatabase() {
                         },
                         Dispatchers.IO.asExecutor()
                     )
+                    // ★★★ fallbackToDestructiveMigration() を一時的に追加するのもあり ★★★
+                    // .fallbackToDestructiveMigration() // 開発初期や大きな変更時は便利だが、本番では注意
                     .build()
                     .also {
                         INSTANCE = it
@@ -72,41 +81,24 @@ abstract class AppDatabase : RoomDatabase() {
                     }
             }
         }
-
-        val MIGRATION_CLEAR_MONSTERS =
-            object : Migration(PREVIOUS_VERSION_FOR_MONSTER_REPOPULATION, CURRENT_DATABASE_VERSION) {
-                override fun migrate(db: SupportSQLiteDatabase) {
-                    Log.i(
-                        TAG,
-                        "MIGRATION_CLEAR_MONSTERS: Migrating from v$PREVIOUS_VERSION_FOR_MONSTER_REPOPULATION to v$CURRENT_DATABASE_VERSION. Clearing monster_table."
-                    )
-                    db.execSQL("DELETE FROM monster_table")
-                    Log.i(TAG, "MIGRATION_CLEAR_MONSTERS: Cleared all data from monster_table.")
-
-                    if (::applicationContextInternal.isInitialized) {
-                        val prefs = applicationContextInternal.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        prefs.edit().remove(getMonsterDataPopulatedKey(CURRENT_DATABASE_VERSION)).apply()
-                        Log.i(TAG, "MIGRATION_CLEAR_MONSTERS: Reset monster population flag for v$CURRENT_DATABASE_VERSION.")
-                    } else {
-                        Log.e(TAG, "MIGRATION_CLEAR_MONSTERS: ApplicationContext not initialized. Cannot reset population flag.")
-                    }
-                }
-            }
     }
 
     private class AppDatabaseCallback(
-        private val context: Context, // ★ ここは applicationContextInternal を受け取る
-        private val scope: CoroutineScope
+        private val context: Context,
+        private val scope: CoroutineScope,
+        private val currentAppDbVersion: Int // ★ アプリが期待するDBバージョン (ここでは INITIAL_DATABASE_VERSION)
     ) : RoomDatabase.Callback() {
 
         private val TAG_CALLBACK = "AppDatabaseCallback"
 
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
-            Log.d(TAG_CALLBACK, "onCreate CALLED! Database version: ${db.version}. Populating monsters from JSON for new DB.")
+            // onCreate はDBが新規作成されたときに呼ばれる。このときの db.version は INITIAL_DATABASE_VERSION になるはず。
+            Log.d(TAG_CALLBACK, "onCreate CALLED! Database version: ${db.version}. Populating initial data.")
             INSTANCE?.let { database ->
                 scope.launch {
                     populateMonstersFromJson(context, database.monsterDao(), "onCreate (DB v${db.version})")
+                    // 新規作成時は、その作成されたDBのバージョンに対してフラグを立てる
                     setMonstersPopulatedFlag(context, db.version, true)
                 }
             }
@@ -114,34 +106,38 @@ abstract class AppDatabase : RoomDatabase() {
 
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
-            Log.d(TAG_CALLBACK, "onOpen CALLED! Database version: ${db.version}")
-            INSTANCE?.let { database ->
-                val populatedAlreadyForThisVersion = getMonstersPopulatedFlag(context, CURRENT_DATABASE_VERSION)
+            Log.d(TAG_CALLBACK, "onOpen CALLED! Database version: ${db.version}. App expects DB version: $currentAppDbVersion")
 
-                if (db.version == CURRENT_DATABASE_VERSION && !populatedAlreadyForThisVersion) {
+            // バージョン1のDBが開かれた場合、onCreateでデータ投入されているはずなので、
+            // 基本的には onOpen での追加のデータ投入は不要かもしれない。
+            // ただし、何らかの理由でonCreateでの投入が不完全だった場合や、
+            // バージョン1でも特定の条件下で再投入したい場合のロジックはここに追加できる。
+            INSTANCE?.let { database ->
+                if (db.version == currentAppDbVersion && !getMonstersPopulatedFlag(context, currentAppDbVersion)) {
                     Log.i(
                         TAG_CALLBACK,
-                        "onOpen: DB is v$CURRENT_DATABASE_VERSION and not yet populated. Repopulating monster_table from JSON."
+                        "onOpen: DB is v$currentAppDbVersion and not yet populated (onCreate might have issues or data cleared manually). Repopulating."
                     )
                     scope.launch {
-                        populateMonstersFromJson(context, database.monsterDao(), "onOpen (after migration to v$CURRENT_DATABASE_VERSION)")
-                        setMonstersPopulatedFlag(context, CURRENT_DATABASE_VERSION, true)
+                        populateMonstersFromJson(context, database.monsterDao(), "onOpen (v$currentAppDbVersion - repopulate)")
+                        setMonstersPopulatedFlag(context, currentAppDbVersion, true)
                     }
-                } else if (db.version == CURRENT_DATABASE_VERSION && populatedAlreadyForThisVersion) {
-                    Log.i(TAG_CALLBACK, "onOpen: Monster data for v$CURRENT_DATABASE_VERSION already populated. No action needed.")
-                } else if (db.version < CURRENT_DATABASE_VERSION) {
-                    Log.w(TAG_CALLBACK, "onOpen: Opened DB with older version ${db.version}. Expecting migration to v$CURRENT_DATABASE_VERSION.")
+                } else if (getMonstersPopulatedFlag(context, db.version)) {
+                    Log.i(TAG_CALLBACK, "onOpen: Data for v${db.version} already populated.")
                 } else {
-                    Log.d(TAG_CALLBACK, "onOpen: DB version is ${db.version}. No specific action for monster repopulation needed for this version based on current logic.")
+                    Log.d(TAG_CALLBACK, "onOpen: No specific repopulation action for v${db.version}.")
                 }
             }
         }
 
         private suspend fun populateMonstersFromJson(context: Context, monsterDao: MonsterDao, trigger: String) {
+            // (populateMonstersFromJson の実装は変更なし)
+            // ただし、MonsterEntityが「rarity」カラムを持つ状態であれば、
+            // JSONファイルにもrarityがあるか、Entityでデフォルト値が設定されている必要がある点に注意。
+            // バージョン1に戻す際に、MonsterEntityからもrarityを一旦削除するなら、この懸念はなくなる。
             Log.d(TAG_CALLBACK, "[$trigger] Attempting to populate monsters from JSON.")
             try {
                 val gson = Gson()
-                // ★ Callbackに渡されたContextを使用
                 context.assets.open("monsters.json").use { inputStream ->
                     InputStreamReader(inputStream).use { reader ->
                         val monsterListType = object : TypeToken<List<MonsterEntity>>() {}.type
@@ -161,125 +157,14 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private fun setMonstersPopulatedFlag(context: Context, version: Int, populated: Boolean) {
-            // ★ Callbackに渡されたContextを使用
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putBoolean(getMonsterDataPopulatedKey(version), populated).apply()
             Log.d(TAG_CALLBACK, "Monster populated flag for v$version set to: $populated")
         }
 
         private fun getMonstersPopulatedFlag(context: Context, version: Int): Boolean {
-            // ★ Callbackに渡されたContextを使用
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             return prefs.getBoolean(getMonsterDataPopulatedKey(version), false)
         }
     }
 }
-
-
-
-
-//package com.sawag.catquestapp.data
-//
-//import android.content.Context
-//import android.util.Log
-//import androidx.room.Database
-//import androidx.room.Room
-//import androidx.room.RoomDatabase
-//import androidx.sqlite.db.SupportSQLiteDatabase
-//import com.sawag.catquestapp.data.monster.MonsterDao
-//import com.sawag.catquestapp.data.monster.MonsterEntity
-//import com.sawag.catquestapp.data.monster.MonsterListContainer
-//// import androidx.sqlite.db.SupportSQLiteDatabase // Callback を使わないので不要
-//import com.sawag.catquestapp.data.user.UserDao // ★ UserDao をインポート
-//import com.sawag.catquestapp.data.user.UserEntity // ★ UserEntity をインポート
-//import kotlinx.coroutines.CoroutineScope
-//// import kotlinx.coroutines.CoroutineScope // getDatabase の引数から削除する場合は不要
-//import kotlinx.coroutines.Dispatchers
-//import kotlinx.coroutines.SupervisorJob
-//import kotlinx.coroutines.asExecutor
-//import kotlinx.coroutines.launch
-//import kotlinx.serialization.json.Json
-//
-//@Database(
-//    entities = [UserEntity::class, MonsterEntity::class], // UserEntity のみ
-//    version = 4,                   // ★ 初期バージョン
-//    exportSchema = false
-//)
-//abstract class AppDatabase : RoomDatabase() {
-//
-//    abstract fun userDao(): UserDao
-//    abstract fun monsterDao(): MonsterDao
-//
-//    companion object {
-//        @Volatile
-//        private var INSTANCE: AppDatabase? = null
-//
-//        // アプリケーションのコルーチン
-//        private var applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-//
-//        // ★ scope 引数を削除し、よりシンプルに
-//        fun getDatabase(context: Context): AppDatabase {
-//            return INSTANCE ?: synchronized(this) {
-//                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
-//            }
-//        }
-//
-//        // ★ scope 引数を削除
-//        private fun buildDatabase(context: Context): AppDatabase {
-//            return Room.databaseBuilder(
-//                context.applicationContext,
-//                AppDatabase::class.java,
-//                "cat_quest_database"
-//            )
-//                .addCallback(AppDatabaseCallback(context, applicationScope))
-//                .fallbackToDestructiveMigration() // バージョン変更でDB再作成を許可 (開発中は便利)
-//                .setQueryCallback( // クエリログはデバッグに役立つので残す
-//                    object : RoomDatabase.QueryCallback {
-//                        override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
-//                            Log.v("RoomQuery", "SQL Query: $sqlQuery SQL Args: $bindArgs")
-//                        }
-//                    },
-//                    Dispatchers.IO.asExecutor()
-//                )
-//                .build()
-//        }
-//    }
-//
-//    // ★ RoomDatabase.Callback を継承したクラスを定義
-//    private class AppDatabaseCallback(
-//        private val context: Context,
-//        private val scope: CoroutineScope
-//    ) : RoomDatabase.Callback() {
-//
-//        override fun onCreate(db: SupportSQLiteDatabase) {
-//            super.onCreate(db)
-//            Log.d("AppDatabaseCallback", "onCreate CALLED! Database version: ${db.version}") // ★ ログ
-//            INSTANCE?.let { database ->
-//                Log.d("AppDatabaseCallback", "INSTANCE is available in onCreate. Populating monsters...") // ★ ログ
-//                scope.launch {
-//                    populateMonsters(context, database.monsterDao())
-//                }
-//            } ?: Log.e("AppDatabaseCallback", "INSTANCE IS NULL in onCreate! Cannot populate monsters.") // ★ ログ
-//        }
-//
-//        suspend fun populateMonsters(context: Context, monsterDao: MonsterDao) {
-//            try {
-//                val jsonString: String
-//                context.assets.open("monsters.json").use { inputStream ->
-//                    jsonString = inputStream.bufferedReader().use { it.readText() }
-//                }
-//
-//                // ignoreUnknownKeys = true を設定しておくと
-//                // JSONにデータクラスにないフィールドがあってもエラーにならない
-//                val monsterData = Json { ignoreUnknownKeys = true }
-//                    .decodeFromString<MonsterListContainer>(jsonString)
-//
-//                monsterDao.insertAllMonsters(monsterData.monsters)
-//                Log.i("AppDatabaseCallback", "${monsterData.monsters.size} monsters populated.")
-//            } catch (e: Exception) {
-//                Log.e("AppDatabaseCallback", "Error populating monsters from JSON", e)
-//            }
-//        }
-//    }
-//}
-//
