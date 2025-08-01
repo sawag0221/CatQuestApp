@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "name": "化け猫",
+    "name": "大化け猫",
     "type": "ねこ",
     "imageResName": "bakeneko_img",
     "hp": 300,
@@ -70,5 +70,17 @@
     "experience": 8,
     "gold": 5,
     "description": "ぷるぷるしたネコ型のスライム。物理攻撃に強い。"
+  },
+  {
+    "id": 7,
+    "name": "猫小娘",
+    "type": "ねこ",
+    "imageResName": "nekokomusume_img",
+    "hp": 50,
+    "attack": 5,
+    "defense": 10,
+    "experience": 8,
+    "gold": 5,
+    "description": "猫というにはあまりにも擬人化しすぎた猫"
   }
 ]
