@@ -1,75 +1,42 @@
-//package com.sawag.catquestapp.data.user
-//
-//import kotlinx.coroutines.flow.Flow
-//
-//class UserRepository(private val userDao: UserDao) {
-//
-//    fun getUser(id: Int = 1): Flow<UserEntity?> {
-//        return userDao.getUser(id)
-//    }
-//
-//    suspend fun upsertUser(userEntity: UserEntity) {
-//        userDao.upsertUser(userEntity)
-//    }
-//
-//    // UserDaoのメソッド名変更と引数変更に対応
-//    suspend fun levelUpUser(
-//        newLevel: Int,
-//        newXp: Long,
-//        newNextLevelXp: Long,
-//        newHp: Int,
-//        newMaxHp: Int,
-//        newMp: Int,
-//        newMaxMp: Int,
-//        newAtk: Int,
-//        newDef: Int,
-//        userId: Int = 1 // idも渡すように変更
-//    ) {
-//        userDao.updateStatsAfterLevelUp(
-//            id = userId, // idを指定
-//            newLevel = newLevel,
-//            newXp = newXp,
-//            newNextLevelXp = newNextLevelXp,
-//            newHp = newHp, // 全回復したHP
-//            newMaxHp = newMaxHp,
-//            newMp = newMp,   // 全回復したMP
-//            newMaxMp = newMaxMp,
-//            newAtk = newAtk,
-//            newDef = newDef
-//        )
-//    }
-//
-//    // UserDaoのメソッド名変更に対応
-//    suspend fun updateXp(newXp: Long, userId: Int = 1) {
-//        userDao.updateXp(id = userId, newXp = newXp)
-//    }
-//
-//    // UserDaoのメソッド名変更に対応
-//    suspend fun updateHp(newHp: Int, userId: Int = 1) {
-//        userDao.updateHp(id = userId, newHp = newHp)
-//    }
-//
-//    // MP更新用のメソッドを追加
-//    suspend fun updateMp(newMp: Int, userId: Int = 1) {
-//        userDao.updateMp(id = userId, newMp = newMp)
-//    }
-//}
-
 package com.sawag.catquestapp.data.user
 
 import kotlinx.coroutines.flow.Flow
 
 class UserRepository(private val userDao: UserDao) {
 
-    suspend fun addUser(user: UserEntity) {
+    // ユーザーを挿入または更新 (UPSERT)
+    suspend fun upsertUser(user: UserEntity) {
+        userDao.upsertUser(user) // UserDaoにupsertUserメソッドが必要
+    }
+
+    // ユーザーを挿入 (主に初期データ用や、明確に新規として扱いたい場合)
+    suspend fun insertUser(user: UserEntity) {
         userDao.insertUser(user)
     }
 
-    fun getUser(userId: Int): Flow<UserEntity?> {
+    // 指定されたIDのユーザーを取得
+    fun getUserById(userId: Int): Flow<UserEntity?> { // メソッド名をDaoと合わせる
         return userDao.getUserById(userId)
     }
 
+    // 全てのユーザーを取得
     fun getAllUsers(): Flow<List<UserEntity>> {
         return userDao.getAllUsers()
     }
+
+    // ★ ユーザーの血統を更新するメソッド
+    suspend fun updateUserBreed(userId: Int, newBreed: String) {
+        userDao.updateUserBreed(userId, newBreed) // UserDaoにこのメソッドが必要
+    }
+
+    // ★ ユーザーエンティティ全体を更新するメソッド (汎用的)
+    suspend fun updateUser(user: UserEntity) {
+        userDao.updateUser(user) // UserDaoにこのメソッドが必要 (Roomの@Updateアノテーション)
+    }
+
+    // 必要であれば削除メソッドなども追加
+    // suspend fun deleteUser(user: UserEntity) {
+    //     userDao.deleteUser(user)
+    // }
 }
+

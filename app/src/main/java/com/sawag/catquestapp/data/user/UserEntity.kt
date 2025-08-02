@@ -1,33 +1,29 @@
-//package com.sawag.catquestapp.data.user
-//
-//import androidx.room.Entity
-//import androidx.room.PrimaryKey
-//
-//@Entity(tableName = "user_table")
-//data class UserEntity(
-//    @PrimaryKey(autoGenerate = true)
-//    val id: Int = 0,
-//    var name: String = "プレイヤー",
-//    var level: Int = 1,
-//    var xp: Long = 0, // experiencePoints から xp に変更
-//    var nextLevelXp: Long = 100, // nextLevelExperiencePoints から nextLevelXp に変更
-//    var hp: Int = 100, // hitPoints から hp に変更
-//    var maxHp: Int = 100, // maxHitPoints から maxHp に変更
-//    var mp: Int = 50,  // mp を追加 (初期値は仮)
-//    var maxMp: Int = 50, // maxMp を追加 (初期値は仮)
-//    var attackPower: Int = 10,
-//    var defensePower: Int = 5,
-//    var gold: Int = 0
-//)
-
+// UserEntity.kt (再掲 - この状態であることを想定)
 package com.sawag.catquestapp.data.user
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "user_table")
 data class UserEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Int = 0, // 主キー、自動生成
-    val name: String
+    @ColumnInfo(name = "management_no")
+    val id: Int = 0,
+
+    @ColumnInfo(name = "name", defaultValue = "プレイヤー") // 初期からあったと仮定
+    val name: String = "プレイヤー",
+
+    @ColumnInfo(name = "level", defaultValue = "1")      // ★追加するカラム
+    val level: Int = 1,
+
+    @ColumnInfo(name = "breed", defaultValue = "'null'")   // ★追加するカラム
+    val breed: String = "null",
+
+    @ColumnInfo(name = "xp", defaultValue = "0")         // ★追加するカラム (experiencePointsに対応)
+    val experiencePoints: Int = 0,
+
+    @ColumnInfo(name = "cat_coins", defaultValue = "0")  // ★追加するカラム (catCoinsに対応)
+    val catCoins: Int = 0
 )
+

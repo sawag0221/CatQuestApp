@@ -1,351 +1,4 @@
-
-////package com.sawag.catquestapp.ui.viewmodel
-////
-////import android.util.Log
-////import androidx.lifecycle.ViewModel
-////import androidx.lifecycle.viewModelScope
-////import com.sawag.catquestapp.data.user.UserEntity
-////import com.sawag.catquestapp.data.user.UserRepository
-////import kotlinx.coroutines.flow.MutableStateFlow
-////import kotlinx.coroutines.flow.StateFlow
-////import kotlinx.coroutines.flow.asStateFlow
-////import kotlinx.coroutines.flow.firstOrNull
-////import kotlinx.coroutines.launch
-////
-////class UserViewModel(private val userRepository: UserRepository) : ViewModel() {
-////
-////    private val _user = MutableStateFlow<UserEntity?>(null)
-////    val user: StateFlow<UserEntity?> = _user.asStateFlow()
-////
-////    init {
-////        loadUser()
-////    }
-////
-////    // UserViewModel.kt
-////    private fun loadUser() {
-////        viewModelScope.launch {
-////            val existingUser = userRepository.getUser().firstOrNull() // Flowから最初の値を取得
-////            if (existingUser == null) {
-////                Log.d("UserViewModel", "初期ユーザーが存在しないため、新規作成します。")
-////                val newUser = UserEntity() // デフォルトコンストラクタで初期ユーザー作成
-////                try {
-////                    userRepository.upsertUser(newUser)
-////                    _user.value = newUser // 作成したユーザーをStateFlowに設定
-////                    Log.i("UserViewModel", "初期ユーザー作成成功: ID=${newUser.id}")
-////                } catch (e: Exception) {
-////                    Log.e("UserViewModel", "初期ユーザー作成失敗", e)
-////                }
-////            } else {
-////                Log.d("UserViewModel", "既存ユーザーをロードしました: ID=${existingUser.id}")
-////                _user.value = existingUser
-////            }
-////
-////            // (オプション) 既存ユーザーがロードされた後も、DBの変更を監視し続けたい場合
-////            // ただし、上記で一度ロードしているので、重複してcollectすると複雑になる可能性も。
-////            // 目的によっては、userRepository.getUser() を直接UI側でcollectする方が良い場合もある。
-////            // 今回は初期ロードと初期作成にフォーカスする。
-////            // userRepository.getUser().collect { updatedUser ->
-////            //     _user.value = updatedUser
-////            // }
-////        }
-////    }
-////
-////    // 経験値を加算するメソッド (戦闘後などに呼び出す)
-////    // UserViewModel.kt - addXpメソッド内
-////    fun addXp(amount: Int) {
-////        viewModelScope.launch {
-////            _user.value?.let { currentUser -> // (A) _user.value を currentUser として取得
-////                val currentXp = currentUser.xp
-////                val newXpLong = currentXp + amount.toLong()
-////
-////                Log.d("UserViewModel", "経験値獲得処理開始: 現在XP=$currentXp, 獲得XP=$amount, 新XP計算値=$newXpLong, ユーザーID=${currentUser.id}")
-////
-////                if (newXpLong >= currentUser.nextLevelXp) {
-////                    Log.d("UserViewModel", "レベルアップ条件を満たしました。checkAndProcessLevelUpを呼び出します。")
-////                    // ★ levelUp() の呼び出しを checkAndProcessLevelUp に変更
-////                    // ★ また、checkAndProcessLevelUp に渡す UserEntity は、
-////                    //    新しい経験値が反映されたものであるべき
-////                    val userWithNewXp = currentUser.copy(xp = newXpLong)
-////                    _user.value = userWithNewXp // UIにも先に新しい経験値を反映
-////                    checkAndProcessLevelUp(userWithNewXp) // (B) 新しい経験値を持つユーザーでレベルアップチェック
-////
-////                    // 注意: checkAndProcessLevelUp が userRepository.levelUpUser を呼び出すと、
-////                    // その結果として _user.value は getUser() の collect によって再度更新されるはず。
-////                    // もし checkAndProcessLevelUp の中で _user.value を直接更新しているなら、
-////                    // ここでの _user.value = userWithNewXp は不要かもしれないが、
-////                    // レベルアップ前に経験値が増えた状態を一度UIに反映する意味はある。
-////
-////                } else {
-////                    // UI反映用のStateFlowを更新
-////                    _user.value = currentUser.copy(xp = newXpLong)
-////                    try {
-////                        userRepository.updateXp(newXp = newXpLong, userId = currentUser.id)
-////                        Log.i("UserViewModel", "XPアップデート成功: ユーザーID=${currentUser.id}, 新XP=$newXpLong")
-////                    } catch (e: Exception) {
-////                        Log.e("UserViewModel", "XPアップデート失敗: ユーザーID=${currentUser.id}, 新XP=$newXpLong", e)
-////                        _user.value = currentUser
-////                    }
-////                }
-////            } ?: run {
-////                Log.w("UserViewModel", "addXp呼び出し時、userデータがnullです。")
-////            }
-////        }
-////    }
-////
-////    // レベルアップ条件をチェックし、必要ならレベルアップ処理を行うメソッド
-////    // 引数として現在のユーザー状態を受け取るように変更
-////    private fun checkAndProcessLevelUp(currentUser: UserEntity) {
-////        viewModelScope.launch {
-////            if (currentUser.xp >= currentUser.nextLevelXp) {
-////                val newLevel = currentUser.level + 1
-////                // 余剰経験値を計算
-////                val surplusXp = currentUser.xp - currentUser.nextLevelXp
-////
-////                // --- ここから新しいステータスの計算 (具体的な計算式はゲームバランスによる) ---
-////                val newMaxHp = currentUser.maxHp + (10..20).random() // 例: 10から20の間でランダムに上昇
-////                val newHp = newMaxHp // HPは全回復
-////
-////                val newMaxMp = currentUser.maxMp + (5..15).random() // 例: 5から15の間でランダムに上昇
-////                val newMp = newMaxMp // MPは全回復
-////
-////                val newAttack = currentUser.attackPower + (2..5).random() // 例: 2から5の間でランダムに上昇
-////                val newDefense = currentUser.defensePower + (1..3).random() // 例: 1から3の間でランダムに上昇
-////
-////                // 次のレベルアップに必要な経験値を設定 (例: 現在の1.5倍)
-////                val newNextLevelXp = (currentUser.nextLevelXp * 1.5).toLong()
-////                // --- ここまで新しいステータスの計算 ---
-////
-////                userRepository.levelUpUser(
-////                    newLevel = newLevel,
-////                    newXp = surplusXp, // 余剰経験値を次のレベルの経験値として設定
-////                    newNextLevelXp = newNextLevelXp,
-////                    newHp = newHp,
-////                    newMaxHp = newMaxHp,
-////                    newMp = newMp,
-////                    newMaxMp = newMaxMp,
-////                    newAtk = newAttack,
-////                    newDef = newDefense,
-////                    userId = currentUser.id
-////                )
-////                // TODO: レベルアップしたことをユーザーに通知するUI処理 (例: Toast, Snackbar, ダイアログなど)
-////                // 例: _levelUpEvent.value = true (LiveDataやSharedFlowでイベントを通知)
-////                println("レベルアップ！ Lv $newLevel になった！") // ログで確認
-////            }
-////        }
-////    }
-////
-////    // ダメージを受ける処理の例 (HP更新)
-////
-////    fun takeDamage(damage: Int) {
-////        viewModelScope.launch {
-////            _user.value?.let { currentUser ->
-////                val newHp = (currentUser.hp - damage).coerceAtLeast(0) // HPが0未満にならないように
-////
-////                Log.d("UserViewModel", "ダメージ処理開始: 現在HP=${currentUser.hp}, ユーザーID=${currentUser.id}, ダメージ量=$damage, 新HP計算値=$newHp")
-////
-////                if (currentUser.hp == newHp) {
-////                    Log.d("UserViewModel", "HPに変化なし。アップデートはスキップします。")
-////                    return@launch
-////                }
-////
-////                // UI反映用のStateFlowを先に更新 (任意だが、UIの即時反応のため)
-////                // ただし、DB更新が失敗した場合のロールバックも考慮する必要が出てくる場合がある
-////                // シンプルにするならDB更新後にUIを更新しても良い
-////                _user.value = currentUser.copy(hp = newHp)
-////
-////                try {
-////                    // ★ UserRepository の updateHp メソッドを呼び出す
-////                    userRepository.updateHp(newHp = newHp, userId = currentUser.id)
-////                    Log.i("UserViewModel", "HPアップデート成功: ユーザーID=${currentUser.id}, 新HP=$newHp")
-////
-////                    if (newHp == 0) {
-////                        Log.w("UserViewModel", "プレイヤーHPが0になりました。ゲームオーバー処理を検討してください。")
-////                        // TODO: HPが0になった場合のゲームオーバー処理などをここに追加
-////                    }
-////
-////                } catch (e: Exception) {
-////                    Log.e("UserViewModel", "HPアップデート失敗: ユーザーID=${currentUser.id}, 新HP=$newHp", e)
-////                    // エラーハンドリング: UI上のHPを元に戻すなどの処理も検討
-////                    _user.value = currentUser // 例: アップデート失敗時はUIを元の状態に戻す
-////                }
-////            } ?: run {
-////                Log.w("UserViewModel", "takeDamage呼び出し時、userデータがnullです。")
-////            }
-////        }
-////    }
-////
-////
-////            // MPを消費する処理の例
-////    fun consumeMp(cost: Int): Boolean { // 消費できたかどうかの結果を返す
-////        var success = false
-////        viewModelScope.launch {
-////            val currentUser = userRepository.getUser().firstOrNull()
-////            currentUser?.let { user ->
-////                if (user.mp >= cost) {
-////                    val newMp = user.mp - cost
-////                    userRepository.updateMp(newMp, user.id)
-////                    success = true
-////                } else {
-////                    // TODO: MPが足りない場合の処理
-////                    println("MPが足りない！")
-////                    success = false
-////                }
-////            }
-////        }.invokeOnCompletion {
-////            // このブロックはコルーチン完了後に実行される (必要に応じて)
-////        }
-////        // 注意: この関数の戻り値はコルーチン完了前に評価されるため、
-////        // 即座に消費結果を知りたい場合はコールバックやFlowを使う方が良い
-////        return success // この return はコルーチン内の success の値を直接は返さない
-////    }
-////
-////
-////    // ユーザーデータを初期化または特定の値に設定する (デバッグ用など)
-////    fun resetOrSetUserData(userEntity: UserEntity) {
-////        viewModelScope.launch {
-////            userRepository.upsertUser(userEntity)
-////        }
-////    }
-////}
-//
-//package com.sawag.catquestapp.ui.viewmodel
-//
-//import android.util.Log
-//import androidx.lifecycle.ViewModel
-//import androidx.lifecycle.viewModelScope
-//import com.sawag.catquestapp.data.user.UserEntity // シンプル版 (id, name のみ)
-//import com.sawag.catquestapp.data.user.UserRepository
-//import kotlinx.coroutines.flow.MutableStateFlow
-//import kotlinx.coroutines.flow.StateFlow
-//import kotlinx.coroutines.flow.asStateFlow
-//import kotlinx.coroutines.flow.firstOrNull // getUser() の戻り値が Flow<UserEntity?> の場合
-//import kotlinx.coroutines.launch
-//
-//class UserViewModel(private val userRepository: UserRepository) : ViewModel() {
-//
-//    private val _user = MutableStateFlow<UserEntity?>(null)
-//    val user: StateFlow<UserEntity?> = _user.asStateFlow()
-//
-//    private val userIdToLoad = 1 // 仮にデフォルトユーザーのIDを1とする
-//
-//    init {
-//        Log.d("UserViewModel", "ViewModel initialized. Attempting to load user with ID: $userIdToLoad")
-//        loadOrCreateUser(userIdToLoad)
-//    }
-//
-//    private fun loadOrCreateUser(userId: Int) {
-//        viewModelScope.launch {
-//            // userRepository.getUser(userId) は Flow<UserEntity?> を返すと仮定
-//            val existingUser = userRepository.getUser(userId).firstOrNull() // Flowから最初の値を取得
-//
-//            if (existingUser == null) {
-//                Log.d("UserViewModel", "User with ID $userId not found. Creating a new default user.")
-//                // ★ シンプルなUserEntityを生成 (idは自動生成されるので指定しないことが多いが、
-//                //    特定のIDで作りたい場合は upsertUser の実装による)
-//                //    ここではupsertUserがID=0で新規作成し、DBが自動採番すると仮定。
-//                //    もし特定のID (例: userIdToLoad) で固定したい場合は、
-//                //    UserEntity(id = userId, name = "Hero") のようにするが、
-//                //    PrimaryKey(autoGenerate = true) の場合は id=0 で渡すのが一般的。
-//                val newUser = UserEntity(name = "Hero") // デフォルト名
-//                try {
-//                    userRepository.upsertUser(newUser) // 新規ユーザーを挿入
-//                    // 挿入後、実際にDBから再取得してIDが確定したユーザーをFlowに流すのがより確実
-//                    // ここでは簡略化のため、upsertUserがIDを確定してくれると期待
-//                    // ただし、autoGenerate = true の場合、newUserのIDは0のまま。
-//                    // DBから再取得するか、upsertUserが挿入したIDを返す設計にする必要がある。
-//                    // 最も簡単なのは、再度 getUser(userId) を呼び出すこと。
-//                    // しかし、初期ユーザーのIDが固定でない場合は、別の方法で初期ユーザーを特定する必要がある。
-//
-//                    // 【改善案】初期ユーザーが存在しない場合、ID=1として作成し、それをロードする
-//                    val defaultUserToCreate = UserEntity(id = userIdToLoad, name = "Hero") // IDを指定して作成
-//                    userRepository.upsertUser(defaultUserToCreate)
-//                    _user.value = defaultUserToCreate // 作成したユーザーをStateFlowに設定
-//                    Log.i("UserViewModel", "Default user created and loaded: ${defaultUserToCreate.name} (ID: ${defaultUserToCreate.id})")
-//
-//                } catch (e: Exception) {
-//                    Log.e("UserViewModel", "Failed to create default user.", e)
-//                }
-//            } else {
-//                _user.value = existingUser
-//                Log.i("UserViewModel", "Existing user loaded: ${existingUser.name} (ID: ${existingUser.id})")
-//            }
-//
-//            // (オプション) 既存ユーザーがロードされた後も、DBの変更を監視し続けたい場合
-//            // この場合、loadOrCreateUser の最初で collect を開始し、
-//            // existingUser のチェックはその collect の中で行う
-//            // 例:
-//            // userRepository.getUser(userId).collect { userFromDb ->
-//            //     if (userFromDb == null && !_user.value?.id == userId) { // まだ初期ユーザー作成前の場合
-//            //         // 初期ユーザー作成ロジック
-//            //     } else {
-//            //         _user.value = userFromDb
-//            //     }
-//            // }
-//            // 今回は初期ロード/作成のみにフォーカス
-//        }
-//    }
-//
-//    // ★★★ UserEntityがシンプルになったため、以下のメソッドは大幅な変更または削除が必要 ★★★
-//
-//    // // 経験値を加算するメソッド (戦闘後などに呼び出す)
-//    // fun addXp(amount: Int) { ... } // xp, nextLevelXp がないので削除または大幅変更
-//
-//    // // レベルアップ条件をチェックし、必要ならレベルアップ処理を行うメソッド
-//    // private fun checkAndProcessLevelUp(currentUser: UserEntity) { ... } // level, xp, nextLevelXp などがないので削除
-//
-//    // // ダメージを受ける処理の例 (HP更新)
-//    // fun takeDamage(damage: Int) { ... } // hp がないので削除
-//
-//    // // MPを消費する処理の例
-//    // fun consumeMp(cost: Int): Boolean { ... } // mp がないので削除
-//
-//
-//    // ユーザー名を変更する例 (シンプルなUserEntityに合わせて)
-//    fun updateUserName(newName: String) {
-//        viewModelScope.launch {
-//            _user.value?.let { currentUser ->
-//                if (currentUser.name == newName) {
-//                    Log.d("UserViewModel", "New name is the same as the current name. No update needed.")
-//                    return@launch
-//                }
-//                val updatedUser = currentUser.copy(name = newName)
-//                try {
-//                    userRepository.upsertUser(updatedUser) // upsertUserで更新
-//                    _user.value = updatedUser // UIにも反映
-//                    Log.i("UserViewModel", "User name updated successfully to: $newName for ID: ${currentUser.id}")
-//                } catch (e: Exception) {
-//                    Log.e("UserViewModel", "Failed to update user name for ID: ${currentUser.id}", e)
-//                    // エラーハンドリング: 必要ならUIを元の状態に戻す
-//                    // _user.value = currentUser
-//                }
-//            } ?: run {
-//                Log.w("UserViewModel", "Cannot update user name, current user is null.")
-//            }
-//        }
-//    }
-//
-//
-//    // ユーザーデータを初期化または特定の値に設定する (デバッグ用など)
-//    // シンプルなUserEntityをupsertする形に
-//    fun resetOrSetUserData(userEntity: UserEntity) {
-//        viewModelScope.launch {
-//            try {
-//                userRepository.upsertUser(userEntity)
-//                // 必要であれば、upsert後に _user.value も更新
-//                if (_user.value?.id == userEntity.id || userEntity.id == userIdToLoad) { // 更新対象が現在のユーザー、またはデフォルトユーザーの場合
-//                    _user.value = userEntity
-//                }
-//                Log.i("UserViewModel", "User data reset/set successfully for ID: ${userEntity.id}")
-//            } catch (e: Exception) {
-//                Log.e("UserViewModel", "Failed to reset/set user data for ID: ${userEntity.id}", e)
-//            }
-//        }
-//    }
-//}
-//
-
-// UserViewModel.kt
-package com.sawag.catquestapp.ui.viewmodel // パッケージ名は適宜変更してください
+package com.sawag.catquestapp.ui.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -356,14 +9,14 @@ import com.sawag.catquestapp.data.user.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull // ★ firstOrNull を使うためにインポート
+// import kotlinx.coroutines.flow.firstOrNull // 現状のコードでは未使用
 import kotlinx.coroutines.launch
 
 // ViewModelに渡すUIの状態を表すクラス
-sealed interface UserUiState {
-    object Loading : UserUiState
-    data class Success(val user: UserEntity) : UserUiState
-    data class Error(val message: String) : UserUiState
+sealed class UserUiState { // sealed class に変更 (interfaceでも可)
+    object Loading : UserUiState()
+    data class Success(val user: UserEntity) : UserUiState()
+    data class Error(val message: String) : UserUiState()
 }
 
 class UserViewModel(private val userRepository: UserRepository) : ViewModel() {
@@ -371,68 +24,134 @@ class UserViewModel(private val userRepository: UserRepository) : ViewModel() {
     private val _uiState = MutableStateFlow<UserUiState>(UserUiState.Loading)
     val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
 
-    // ユーザーエンティティそのものを公開したい場合はこちらも用意 (任意)
-    private val _user = MutableStateFlow<UserEntity?>(null)
-    val user: StateFlow<UserEntity?> = _user.asStateFlow()
+    // ユーザーエンティティそのものを公開したい場合はこちらも用意
+    // currentUserとして公開し、uiStateがSuccessの時に値を持ち、それ以外はnullになるようにする
+    private val _currentUser = MutableStateFlow<UserEntity?>(null)
+    val currentUser: StateFlow<UserEntity?> = _currentUser.asStateFlow() // ★ 名前を currentUser に変更
 
     companion object {
         private const val TAG = "UserViewModel"
-    }
+        private const val DEFAULT_USER_ID: Int = 1 // ★ DEFAULT_USER_ID を定義 (Int型)
 
-    init {
-        Log.d(TAG, "init: Initializing UserViewModel")
-        loadOrCreateUser()
-    }
-
-    private fun loadOrCreateUser() {
-        viewModelScope.launch {
-            _uiState.value = UserUiState.Loading // 処理開始時にLoading状態にする
-            Log.d(TAG, "loadOrCreateUser: Attempting to load or create user...")
-            try {
-                // 1. DBから最初のユーザーを取得試行 (コールバックで作成されたはず)
-                var currentUser = userRepository.getAllUsers().firstOrNull()?.firstOrNull() // Flow<List<User>> -> List<User>? -> User?
-
-                if (currentUser != null) {
-                    Log.d(TAG, "loadOrCreateUser: Found existing user from DB: ${currentUser.name} (ID: ${currentUser.id})")
-                } else {
-                    Log.w(TAG, "loadOrCreateUser: No user found in DB. Likely callback didn't run or DB was empty. Creating a fallback user 'Hero'.")
-                    // 2. 存在しない場合は新しいフォールバックユーザー "Hero" を作成して保存
-                    val fallbackUserName = "Hero"
-                    val fallbackUserEntity = UserEntity(name = fallbackUserName) // idは自動生成
-                    userRepository.addUser(fallbackUserEntity) // DBに保存
-
-                    // 保存後、再度取得を試みる (IDが振られ、確実に存在するか確認)
-                    // 名前で検索する機能がDaoにあればそれを使うのが確実だが、なければ再度getAllUsersから探す
-                    currentUser = userRepository.getAllUsers().firstOrNull()?.find { it.name == fallbackUserName }
-
-                    if (currentUser != null) {
-                        Log.d(TAG, "loadOrCreateUser: Successfully created and retrieved fallback user: ${currentUser.name} (ID: ${currentUser.id})")
-                    } else {
-                        Log.e(TAG, "loadOrCreateUser: CRITICAL - Failed to retrieve fallback user even after attempting to create it!")
-                        _uiState.value = UserUiState.Error("Failed to initialize user data. Could not create fallback.")
-                        _user.value = null
-                        return@launch // これ以上処理を進めない
+        // ViewModelProvider.Factory を提供するメソッド
+        fun provideFactory(
+            userRepository: UserRepository
+        ): ViewModelProvider.Factory {
+            return object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    if (modelClass.isAssignableFrom(UserViewModel::class.java)) {
+                        return UserViewModel(userRepository) as T
                     }
+                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
-
-                // ユーザーが見つかった場合 (コールバックから or フォールバック作成)
-                _user.value = currentUser
-                _uiState.value = UserUiState.Success(currentUser) // currentUserはここでnullでないはず
-                Log.d(TAG, "loadOrCreateUser: User set in ViewModel: ${currentUser.name}")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "loadOrCreateUser: Error loading or creating user", e)
-                _uiState.value = UserUiState.Error(e.message ?: "Unknown error during user initialization")
-                _user.value = null
             }
         }
     }
 
-    // 必要に応じてユーザー情報を更新するメソッドなどを追加
-    //例: fun updateUserName(newName: String) { ... }
+    init {
+        Log.d(TAG, "init: Initializing UserViewModel with user ID: $DEFAULT_USER_ID")
+        loadUser(DEFAULT_USER_ID) // ★ loadOrCreateUser から loadUser に変更 (名前をより明確に)
+    }
+
+    // IDを指定してユーザーをロードする関数
+    private fun loadUser(userId: Int) {
+        viewModelScope.launch {
+            _uiState.value = UserUiState.Loading
+            _currentUser.value = null // ローディング開始時に currentUser もクリア
+            Log.d(TAG, "loadUser: Attempting to load user with ID $userId...")
+            try {
+                // userRepository.getUserById は Flow<UserEntity?> を返す想定
+                userRepository.getUserById(userId).collect { userFromDb ->
+                    if (userFromDb != null) {
+                        Log.d(TAG, "loadUser: User found: ID=${userFromDb.id}, Breed=${userFromDb.breed}, Lvl=${userFromDb.level}")
+                        _uiState.value = UserUiState.Success(userFromDb)
+                        _currentUser.value = userFromDb // ★ currentUser にもセット
+                    } else {
+                        Log.w(TAG, "loadUser: User with ID $userId NOT found. This might indicate an issue with initial data population or wrong ID.")
+                        // AppDatabaseCallback で初期ユーザーが作られるはずなので、
+                        // ここでユーザーが存在しない場合は、明確なエラーとして扱うか、
+                        // または特定のシナリオ (例: 初回起動でまだ何も選択していない状態) を示す別のStateを定義するか検討
+                        _uiState.value = UserUiState.Error("User with ID $userId not found. Database might be empty or ID is incorrect.")
+                        _currentUser.value = null
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadUser: Error loading user with ID $userId", e)
+                _uiState.value = UserUiState.Error(e.message ?: "Unknown error during user loading")
+                _currentUser.value = null
+            }
+        }
+    }
+
+    // 血統を選択・更新する関数
+    fun selectBreedAndUpdateUser(breedName: String) {
+        viewModelScope.launch {
+            val userToUpdate = _currentUser.value // 現在ロードされているユーザー情報を取得
+            if (userToUpdate != null) {
+                // すでに同じ血統が設定されているか、または初期状態("null")でなければ更新
+                if (userToUpdate.breed == "null" || userToUpdate.breed != breedName) {
+                    Log.d(TAG, "selectBreedAndUpdateUser: Updating breed for user ${userToUpdate.id} from '${userToUpdate.breed}' to '$breedName'")
+                    try {
+                        userRepository.updateUserBreed(userToUpdate.id, breedName)
+                        // DB更新後、UserDaoのgetUserByIdがFlowなので、
+                        // loadUser 内の collect が自動的に最新のユーザー情報を検知し、_uiState と _currentUser が更新されるはず。
+                        Log.i(TAG, "selectBreedAndUpdateUser: Breed update request sent for user ${userToUpdate.id}. UI should refresh via Flow.")
+                        // 必要であれば、ここで明示的に再ロードをトリガーすることも可能だが、Flowの動作に任せるのが理想。
+                        // loadUser(userToUpdate.id) // もしFlowで自動更新されない場合のフォールバック
+                    } catch (e: Exception) {
+                        Log.e(TAG, "selectBreedAndUpdateUser: Error updating breed for user ${userToUpdate.id}", e)
+                        // エラーが発生した場合、UIにエラーメッセージを表示する
+                        // (現在の_uiStateがSuccessのままなので、エラー用のStateを発行するか検討)
+                        // 例: _uiState.value = UserUiState.Error("Failed to update breed: ${e.message}")
+                        // ただし、この操作が失敗してもユーザーデータ自体はまだ読み込めている状態なので、
+                        // UI全体をエラー状態にするかは設計次第。一時的なトースト表示なども考えられる。
+                    }
+                } else {
+                    Log.d(TAG, "selectBreedAndUpdateUser: Breed '$breedName' is already set for user ${userToUpdate.id}. No update needed.")
+                }
+            } else {
+                Log.e(TAG, "selectBreedAndUpdateUser: Cannot update breed, current user is null. User might not be loaded yet.")
+                // ユーザーがロードされていない状態でこの関数が呼ばれるのは通常予期しない
+                // _uiState を Error にすることも検討
+                // _uiState.value = UserUiState.Error("Cannot select breed: User data not loaded.")
+            }
+        }
+    }
+
+    // 他のユーザー情報更新メソッドのプレースホルダー
+    fun gainExperience(xp: Int) {
+        viewModelScope.launch {
+            _currentUser.value?.let { user ->
+                val updatedUser = user.copy(experiencePoints = user.experiencePoints + xp)
+                // userRepository.updateUser(updatedUser) // UserRepositoryに更新メソッドが必要
+                // レベルアップロジックなどもここに追加
+                Log.d(TAG, "User ${user.id} gained $xp XP. New XP: ${updatedUser.experiencePoints}")
+            }
+        }
+    }
+
+    fun spendCatCoins(amount: Int) {
+        viewModelScope.launch {
+            _currentUser.value?.let { user ->
+                if (user.catCoins >= amount) {
+                    val updatedUser = user.copy(catCoins = user.catCoins - amount)
+                    // userRepository.updateUser(updatedUser)
+                    Log.d(TAG, "User ${user.id} spent $amount cat coins. Remaining: ${updatedUser.catCoins}")
+                } else {
+                    Log.w(TAG, "User ${user.id} does not have enough cat coins to spend $amount.")
+                    // UIに通知する処理など
+                }
+            }
+        }
+    }
 }
 
-// ViewModelFactory (UserViewModelにUserRepositoryを渡すため)
+// ViewModelFactory はViewModelファイルの外 (例: ApplicationクラスやDIモジュール) に置くか、
+// 上記のように companion object 内の provideFactory メソッドで提供するのが一般的です。
+// ここでは、provideFactory を使っているので、独立した UserViewModelFactory クラスは削除しても良いでしょう。
+// もし残す場合は、このファイル内ではなく、別のファイルに配置することを検討してください。
+
 class UserViewModelFactory(private val userRepository: UserRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(UserViewModel::class.java)) {
@@ -442,4 +161,5 @@ class UserViewModelFactory(private val userRepository: UserRepository) : ViewMod
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+
 

@@ -53,7 +53,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sawag.catquestapp.ui.theme.CatQuestAppTheme
+import com.sawag.catquestapp.ui.viewmodel.UserViewModel
 
 // アプリケーション全体で共有、またはこの機能群で共有するJsonインスタンス
 // このファイルや、関連するファイルをまとめたパッケージのトップレベルに定義するのが一般的
@@ -152,7 +154,8 @@ fun convertToDisplayData(
 @Composable
 fun BreedSelectionScreen(
     modifier: Modifier = Modifier,
-    onBreedSelected: (String) -> Unit
+    onNavigateToNextScreen: () -> Unit,
+    userViewModel: UserViewModel // ★ 引数で UserViewModel を受け取る
 ) {
     val context = LocalContext.current // ★ Contextを取得
     // ★ JSONから読み込んだデータを保持する状態
@@ -292,15 +295,26 @@ fun BreedSelectionScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+            // ... (ページインジケータ Row) ...
+            Row( /* ... */) { /* ... */ }
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    // ★ bounds check
                     if (pagerState.currentPage < breeds.size) {
-                        val selectedBreedName = breeds[pagerState.currentPage].name
-                        Log.d("BreedSelection", "$selectedBreedName が選択されました")
-                        onBreedSelected(selectedBreedName) // ここではnameを渡しているが、idを渡す方が良い場合もある
+                        val selectedBreed = breeds[pagerState.currentPage] // BreedDisplayData を取得
+                        Log.d(
+                            "BreedSelection",
+                            "${selectedBreed.name} (ID: ${selectedBreed.id}) が選択されました"
+                        )
+
+                        // ★ UserViewModel を使って血統を更新
+                        userViewModel.selectBreedAndUpdateUser(selectedBreed.name)
+                        // onBreedSelected(selectedBreed.name) // 古いコールバックは削除またはViewModel経由に置き換え
+
+                        // ★ 血統選択後、次の画面へ遷移
+                        onNavigateToNextScreen()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(0.8f)
@@ -311,199 +325,15 @@ fun BreedSelectionScreen(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun BreedSelectionScreenPreview() {
-    CatQuestAppTheme {
-        // プレビューではJSON読み込みが難しいため、ダミーデータを使うか、
-        // BreedSelectionScreenに直接ダミーリストを渡せるように引数を変更するなどの工夫が必要
-        // ここでは、プレビューがクラッシュしないように、onBreedSelectedのみ渡す
-        BreedSelectionScreen(
-            onBreedSelected = { selectedBreed ->
-                Log.d("Preview", "Breed selected in preview: $selectedBreed")
-            }
-        )
-        // または、プレビュー用にダミーのBreedDisplayDataリストを作成して渡す
-        // val dummyBreeds = listOf(
-        //     BreedDisplayData(1, "プレビュー猫1", R.drawable.american_shorthair_placeholder),
-        //     BreedDisplayData(2, "プレビュー猫2", R.drawable.scottish_fold_placeholder)
-        // )
-        // BreedSelectionScreen(breeds = dummyBreeds, onBreedSelected = { ... })
-        // ※ その場合、BreedSelectionScreenの引数に breeds: List<BreedDisplayData> を追加する必要がある
-    }
-}
-
-
-//data class BreedData(val name: String, val imageResId: Int)
-//
-//// ★ キャラクター画像を上下にアニメーションさせるコンポーザブル
-//@Composable
-//fun AnimatedCharacterImage(
-//    imageResId: Int,
-//    contentDescription: String,
-//    modifier: Modifier = Modifier
-//) {
-//    val infiniteTransition = rememberInfiniteTransition(label = "character_bobbing")
-//    val offsetY by infiniteTransition.animateFloat(
-//        initialValue = -8f, // 上に移動する量 (dp単位で調整) - 少し控えめに
-//        targetValue = 8f,  // 下に移動する量 (dp単位で調整) - 少し控えめに
-//        animationSpec = infiniteRepeatable(
-//            animation = tween(durationMillis = 1800, easing = LinearEasing), // 少しゆっくりめに
-//            repeatMode = RepeatMode.Reverse
-//        ),
-//        label = "offsetY"
-//    )
-//
-//    Image(
-//        painter = painterResource(id = imageResId),
-//        contentDescription = contentDescription,
-//        modifier = modifier.offset(y = offsetY.dp) // Y軸方向にオフセットを適用
-//    )
-//}
-//
-//
-//// 新しい血統画面の composable
-//// @OptIn(ExperimentalFoundationApi::class) // HorizontalPagerが安定版になったため不要な場合は削除
-//@Composable
-//fun BreedSelectionScreen(
-//    modifier: Modifier = Modifier,
-//    onBreedSelected: (String) -> Unit
-//) {
-//    val breeds = listOf(
-//        BreedData("アメリカンショートヘア", R.drawable.american_shorthair_placeholder),
-//        BreedData("スコティッシュフォールド", R.drawable.scottish_fold_placeholder),
-//        BreedData("ロシアンブルー", R.drawable.russian_blue_placeholder),
-//        BreedData("マンチカン", R.drawable.munchkin_placeholder),
-//        BreedData("三毛様", R.drawable.mikesama_placeholder)
-//    )
-//
-//    val pagerState = rememberPagerState(pageCount = { breeds.size })
-//
-//    LaunchedEffect(pagerState) {
-//        snapshotFlow { pagerState.currentPage }.collect { page ->
-//            Log.d("BreedSelection", "Current page: ${breeds[page].name}")
-//        }
-//    }
-//
-//    Box( // ★ Boxで全体を囲み、背景画像を設定
-//        modifier = modifier.fillMaxSize()
-//    ) {
-//        // 背景画像
-//        Image(
-//            painter = painterResource(id = R.drawable.cat_room_background_placeholder), // ★ 背景画像のリソースID (仮)
-//            contentDescription = "Background",
-//            contentScale = ContentScale.Crop, // 画像をどのように表示するか
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .then(
-//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//                        Modifier.blur(
-//                            radius = 16.dp,
-//                            edgeTreatment = BlurredEdgeTreatment.Rectangle
-//                        )
-//                    } else {
-//                        // Android 12未満の場合の代替 (例: 半透明オーバーレイ)
-//                        Modifier.drawWithContent {
-//                            drawContent()
-//                            drawRect(Color.Black.copy(alpha = 0.30f)) // 15%くらいの黒など、調整してみてください
-//                        }
-//                    }
-//                )
-//        )
-//
-//        // 背景の上に重ねるコンテンツ
-//        Column(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .padding(16.dp),
-//            horizontalAlignment = Alignment.CenterHorizontally,
-//        ) {
-//            Text(
-//                "血統を選んでにゃ！",
-//                style = MaterialTheme.typography.headlineMedium,
-//                color = Color.Black // ★ 背景によっては文字色を調整 (例: 黒)
-//                // 必要であれば、テキストに影をつけるなども検討 (modifier = Modifier.shadow(...))
-//            )
-//            Spacer(modifier = Modifier.height(24.dp))
-//
-//            HorizontalPager(
-//                state = pagerState,
-//                modifier = Modifier
-//                    .weight(1f)
-//                    .fillMaxWidth(),
-//                contentPadding = PaddingValues(horizontal = 32.dp)
-//            ) { pageIndex ->
-//                val breed = breeds[pageIndex]
-//                Column(
-//                    horizontalAlignment = Alignment.CenterHorizontally,
-//                    verticalArrangement = Arrangement.Center,
-//                    modifier = Modifier.fillMaxSize()
-//                ) {
-//                    // ★ 上下アニメーションするキャラクター画像に変更
-//                    AnimatedCharacterImage(
-//                        imageResId = breed.imageResId,
-//                        contentDescription = breed.name,
-//                        modifier = Modifier
-//                            .size(200.dp)
-//                            .padding(8.dp)
-//                    )
-//                    Spacer(modifier = Modifier.height(16.dp))
-//                    Text(
-//                        text = breed.name,
-//                        style = MaterialTheme.typography.titleLarge,
-//                        textAlign = TextAlign.Center,
-//                        color = Color.Black // ★ 背景によっては文字色を調整 (例: 黒)
-//                    )
-//                }
-//            }
-//
-//            Spacer(modifier = Modifier.height(24.dp))
-//
-//            // ページインジケータ
-//            Row(
-//                Modifier
-//                    .height(24.dp) // 少し高さを抑える
-//                    .fillMaxWidth(),
-//                horizontalArrangement = Arrangement.Center,
-//                verticalAlignment = Alignment.CenterVertically
-//            ) {
-//                repeat(breeds.size) { iteration ->
-//                    val color =
-//                        if (pagerState.currentPage == iteration) Color.DarkGray else Color.LightGray
-//                    Box(
-//                        modifier = Modifier
-//                            .padding(horizontal = 4.dp) // 少し間隔をあける
-//                            .clip(CircleShape)
-//                            .background(color)
-//                            .size(12.dp) // 少し小さくする
-//                    )
-//                }
-//            }
-//
-//            Spacer(modifier = Modifier.height(16.dp)) // ボタンとの間隔
-//
-//            Button(
-//                onClick = {
-//                    val selectedBreedName = breeds[pagerState.currentPage].name
-//                    Log.d("BreedSelection", "$selectedBreedName が選択されました")
-//                    onBreedSelected(selectedBreedName)
-//                },
-//                modifier = Modifier.fillMaxWidth(0.8f)
-//            ) {
-//                Text("この子にする！")
-//            }
-//        }
-//    }
-//}
-//
+// Preview の呼び出し (エラーになる箇所)
 //@Preview(showBackground = true)
 //@Composable
 //fun BreedSelectionScreenPreview() {
 //    CatQuestAppTheme {
-//        BreedSelectionScreen(
-//            onBreedSelected = { selectedBreed ->
-//                Log.d("Preview", "Breed selected in preview: $selectedBreed")
-//            }
+//        BreedSelectionScreen( // ★ userViewModel が渡されていない
+//            onNavigateToNextScreen = { Log.d("Preview", "Navigate to next screen triggered") }
 //        )
 //    }
 //}
+
+
