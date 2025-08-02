@@ -162,68 +162,6 @@ fun UserScreen(uiState: UserUiState) {
     }
 }
 
-//class MainActivity : ComponentActivity() {
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//        enableEdgeToEdge()
-//
-//        // --- Room 最小構成テストコード ---
-//        Log.d("MainActivityRoomTest", "Attempting to get database instance directly from Activity...")
-//        try {
-//            val testDb = Room.databaseBuilder(
-//                applicationContext,
-//                AppDatabase::class.java, // AppDatabaseクラス自体を参照
-//                "test_activity_db_0727_v2" // ★ 新しい、かつユニークなDB名
-//            )
-//                .fallbackToDestructiveMigrationFrom(1) // スキーマバージョン1からのマイグレーション失敗時に破棄
-//                .addCallback(object : RoomDatabase.Callback() { // インラインでコールバックを定義
-//                    override fun onCreate(db: SupportSQLiteDatabase) {
-//                        super.onCreate(db)
-//                        Log.d("MainActivityRoomTest", "Activity Test DB - Callback.onCreate() CALLED")
-//                    }
-//
-//                    override fun onOpen(db: SupportSQLiteDatabase) {
-//                        super.onOpen(db)
-//                        Log.d("MainActivityRoomTest", "Activity Test DB - Callback.onOpen() CALLED")
-//                    }
-//                })
-//                .setQueryExecutor(Dispatchers.IO.asExecutor()) // ★ クエリエグゼキュータを指定 (任意だが推奨)
-//                .setTransactionExecutor(Dispatchers.IO.asExecutor()) // ★ トランザクションエグゼキュータを指定 (任意だが推奨)
-//                // .allowMainThreadQueries() // ★ デバッグ用に一時的に許可するのもあり (非推奨)
-//                .build()
-//            Log.d("MainActivityRoomTest", "Database instance obtained from Activity: $testDb")
-//
-//            // 簡単なクエリを投げてみる (もしDBが作成されていれば)
-//            // GlobalScope はテスト用。実際は ViewModelScope などを使う
-//            GlobalScope.launch(Dispatchers.IO) { // IOスレッドで実行
-//                try {
-//                    // MonsterDaoのメソッドが存在するか確認。なければUserDaoのメソッドで試す
-//                    // もしMonsterEntity/Daoがまだ不確かなら、UserEntity/Daoで試した方が確実かもしれません。
-//                    // val monsterCount = testDb.monsterDao().getMonsterCount()
-//                    // Log.d("MainActivityRoomTest", "Monster count from Activity Test DB: $monsterCount")
-//
-//                    // 例: UserDao のメソッドを呼び出す場合 (UserDao と getCount が定義されていると仮定)
-//                    val userCount = testDb.userDao().getUserCount() // ★ UserDao に getUserCount() を追加する必要があるかも
-//                    Log.d("MainActivityRoomTest", "User count from Activity Test DB: $userCount")
-//
-//
-//                } catch (e: Exception) {
-//                    Log.e("MainActivityRoomTest", "Error querying Activity Test DB", e)
-//                }
-//            }
-//        } catch (e: Exception) {
-//            Log.e("MainActivityRoomTest", "Error building database in Activity", e)
-//        }
-//        // --- Room 最小構成テストコード 終了 ---
-//
-//        setContent {
-//            CatQuestAppTheme {
-//                CatQuestAppNavigation() // Navigationを別Composableに分離 (任意)
-//            }
-//        }
-//    }
-//}
-
 @Composable
 fun CatQuestAppNavigation() { // NavHostControllerを引数に取るように変更も可能
     val navController = rememberNavController()
@@ -301,7 +239,6 @@ fun CatQuestAppNavigation() { // NavHostControllerを引数に取るように変
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable
