@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.navigation
 import com.sawag.catquestapp.CatQuestApplication // ★ Applicationクラスをインポート
+import com.sawag.catquestapp.UserRegistrationScreen
 import com.sawag.catquestapp.ui.theme.CatQuestAppTheme
 import com.sawag.catquestapp.ui.viewmodel.UserUiState
 import com.sawag.catquestapp.ui.viewmodel.UserViewModel
@@ -64,9 +65,11 @@ import com.sawag.catquestapp.ui.viewmodel.UserViewModel
 // 画面のルートを定義
 object AppDestinations {
     const val WELCOME_SCREEN = "welcome"
+    const val USER_REGISTRATION_SCREEN = "user_registration" // 追加
     const val BREED_SELECTION_SCREEN = "breed_selection"
     const val DUNGEON_SELECTION_SCREEN = "dungeon_selection" // 変更
     const val COMBAT_SCREEN = "combat_screen"             // 追加
+    const val CHARACTER_CREATION_FLOW_ROUTE = "character_creation_flow" // ネストされたグラフのルート名
 }
 
 
@@ -99,101 +102,93 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-//@Composable
-//fun UserScreen(uiState: UserUiState) {
-//    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//        when (uiState) {
-//            is UserUiState.Loading -> {
-//                Log.d("UserScreen", "Displaying Loading state")
-//                CircularProgressIndicator()
-//            }
-//            is UserUiState.Success -> {
-//                val user = uiState.user
-//                Log.d("UserScreen", "Displaying Success state for user: ${user.name}")
-//                Text("User Loaded: ${user.name} (ID: ${user.id})")
-//                // ここでユーザー情報を使ったUIを構築
-//            }
-//            is UserUiState.Error -> {
-//                Log.e("UserScreen", "Displaying Error state: ${uiState.message}")
-//                Text("Error: ${uiState.message}")
-//            }
-//        }
-//    }
-//}
-
 @Composable
 fun CatQuestAppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
     val application = LocalContext.current.applicationContext as CatQuestApplication
+    // UserViewModel を Activity/Application スコープで取得
+    val userViewModel: UserViewModel = viewModel(
+        factory = UserViewModel.provideFactory(application.userRepository)
+    )
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = AppDestinations.WELCOME_SCREEN, // アプリ全体の開始点は Welcome
+            startDestination = AppDestinations.WELCOME_SCREEN,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(AppDestinations.WELCOME_SCREEN) {
                 CatQuestWelcomeScreen(
-                    onStartAdventureClick = {
-                        // "character_creation_flow" グラフに遷移
-                        navController.navigate("character_creation_flow") {
-                            // Welcome画面には戻らないようにする場合
+                    userViewModel = userViewModel,
+                    onNavigateToRegistration = {
+                        navController.navigate(AppDestinations.USER_REGISTRATION_SCREEN)
+                        // WelcomeScreen には戻れないように popUpTo はしないでおくか、
+                        // するなら character_creation_flow 完了時にまとめて消すなど検討
+                    },
+                    onNavigateToCharacterCreation = {
+                        navController.navigate(AppDestinations.CHARACTER_CREATION_FLOW_ROUTE) {
                             popUpTo(AppDestinations.WELCOME_SCREEN) { inclusive = true }
                         }
                     }
                 )
             }
 
-            // ★ UserViewModel を共有する画面群のナビゲーショングラフ
+            composable(AppDestinations.USER_REGISTRATION_SCREEN) {
+                UserRegistrationScreen(
+                    userViewModel = userViewModel,
+                    onNavigateToCharacterCreation = {
+                        navController.navigate(AppDestinations.CHARACTER_CREATION_FLOW_ROUTE) {
+                            // 登録画面とウェルカム画面をスタックから消す
+                            popUpTo(AppDestinations.WELCOME_SCREEN) { inclusive = true }
+                        }
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack() // WelcomeScreen に戻る
+                    }
+                )
+            }
+
             navigation(
-                startDestination = AppDestinations.BREED_SELECTION_SCREEN,
-                route = "character_creation_flow" // ★ このグラフのルート名
+                route = AppDestinations.CHARACTER_CREATION_FLOW_ROUTE,
+                startDestination = AppDestinations.BREED_SELECTION_SCREEN
             ) {
                 composable(AppDestinations.BREED_SELECTION_SCREEN) { backStackEntry ->
-                    // "character_creation_flow" グラフにスコープされた ViewModel を取得
+                    // ネストされたナビゲーショングラフ内でViewModelを共有する場合
                     val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry("character_creation_flow")
+                        navController.getBackStackEntry(AppDestinations.CHARACTER_CREATION_FLOW_ROUTE)
                     }
-                    val userViewModel: UserViewModel = viewModel(
-                        viewModelStoreOwner = parentEntry, // ★ グラフのルートにスコープ
-                        factory = UserViewModel.provideFactory(application.userRepository)
-                    )
-
+                    val characterCreationViewModel: UserViewModel =
+                        viewModel( // ここは UserViewModel で良いか検討
+                            viewModelStoreOwner = parentEntry,
+                            factory = UserViewModel.provideFactory(application.userRepository)
+                        )
                     BreedSelectionScreen(
+                        userViewModel = characterCreationViewModel, // またはグローバルの userViewModel
                         onNavigateToNextScreen = {
                             navController.navigate(AppDestinations.DUNGEON_SELECTION_SCREEN)
-                            // ここでの popUpTo は、この "character_creation_flow" 内での挙動を考える
-                            // 例えば BREED_SELECTION_SCREEN には戻らないようにするなど
-                            // popUpTo(AppDestinations.BREED_SELECTION_SCREEN) { inclusive = true }
-                        },
-                        userViewModel = userViewModel
+                        }
                     )
                 }
-
                 composable(AppDestinations.DUNGEON_SELECTION_SCREEN) { backStackEntry ->
-                    // 同じく "character_creation_flow" グラフにスコープされた ViewModel を取得
                     val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry("character_creation_flow")
+                        navController.getBackStackEntry(AppDestinations.CHARACTER_CREATION_FLOW_ROUTE)
                     }
-                    val userViewModel: UserViewModel = viewModel(
-                        viewModelStoreOwner = parentEntry, // ★ グラフのルートにスコープ
+                    val userViewModelForDungeon: UserViewModel = viewModel(
+                        viewModelStoreOwner = parentEntry,
                         factory = UserViewModel.provideFactory(application.userRepository)
                     )
-
                     DungeonSelectionScreen(
-                        userViewModel = userViewModel,
+                        userViewModel = userViewModelForDungeon,
                         onNavigateToCombat = { dungeonId ->
                             val playerBreedName =
-                                userViewModel.currentUser.value?.breed ?: "不明な猫"
+                                userViewModelForDungeon.currentUser.value?.breed ?: "不明な猫"
                             navController.navigate("${AppDestinations.COMBAT_SCREEN}/$dungeonId/$playerBreedName")
                         },
-                        onNavigateBack = { navController.popBackStack() } // このグラフ内で戻る
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
-
-                // COMBAT_SCREEN など、userViewModel を共有したい他の画面もこのグラフ内に追加
+                // COMBAT_SCREEN の定義 ...
                 composable(
                     route = "${AppDestinations.COMBAT_SCREEN}/{dungeonId}/{playerBreedName}",
                     arguments = listOf(
@@ -201,36 +196,26 @@ fun CatQuestAppNavigation(
                         navArgument("playerBreedName") { type = NavType.StringType }
                     )
                 ) { backStackEntry ->
-                    val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry("character_creation_flow")
-                    }
-//                    val userViewModel: UserViewModel = viewModel(
-//                        viewModelStoreOwner = parentEntry,
-//                        factory = UserViewModel.provideFactory(application.userRepository)
-//                    )
-                    val dungeonId = backStackEntry.arguments?.getString("dungeonId")
-                        ?: "unknown_dungeon" // ★ String で取得
+                    // ... CombatScreen の実装
+                    val dungeonId =
+                        backStackEntry.arguments?.getString("dungeonId") ?: "unknown_dungeon"
                     val playerBreedName =
                         backStackEntry.arguments?.getString("playerBreedName") ?: "不明な猫"
-
                     CombatScreen(
-                        dungeonId = dungeonId,                // String を渡す
-                        playerBreedName = playerBreedName,    // String を渡す
+                        dungeonId = dungeonId,
+                        playerBreedName = playerBreedName,
                         onCombatEnd = {
-                            // 例: ダンジョン選択画面に戻るなど
                             navController.popBackStack(
                                 AppDestinations.DUNGEON_SELECTION_SCREEN,
                                 inclusive = false
                             )
                         },
                         onRunAway = {
-                            // 例: ダンジョン選択画面に戻るなど
                             navController.popBackStack(
                                 AppDestinations.DUNGEON_SELECTION_SCREEN,
                                 inclusive = false
                             )
                         }
-                        // viewModel は CombatScreen 側で default viewModel() で取得するので、ここでは渡さない
                     )
                 }
             }
@@ -239,13 +224,13 @@ fun CatQuestAppNavigation(
 }
 
 
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    CatQuestAppTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            // Previewでは、CatQuestWelcomeScreenを直接表示するように変更すると良いでしょう
-            CatQuestWelcomeScreen(onStartAdventureClick = {})
-        }
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun DefaultPreview() {
+//    CatQuestAppTheme {
+//        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+//            // Previewでは、CatQuestWelcomeScreenを直接表示するように変更すると良いでしょう
+//            CatQuestWelcomeScreen(onStartAdventureClick = {})
+//        }
+//    }
+//}

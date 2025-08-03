@@ -2,9 +2,10 @@ package com.sawag.catquestapp // あなたのパッケージ名
 
 import android.app.Application
 import android.util.Log
+import androidx.lifecycle.ViewModelProvider
 import com.sawag.catquestapp.data.AppDatabase
 import com.sawag.catquestapp.data.user.UserRepository
-import com.sawag.catquestapp.ui.viewmodel.UserViewModelFactory
+import com.sawag.catquestapp.ui.viewmodel.UserViewModel
 import kotlinx.coroutines.CoroutineScope // ← 必要
 import kotlinx.coroutines.Dispatchers   // ← 必要
 import kotlinx.coroutines.SupervisorJob // ← 必要
@@ -25,8 +26,12 @@ class CatQuestApplication : Application() {
     // UserRepositoryのインスタンス (lazy初期化)
     val userRepository by lazy { UserRepository(database.userDao()) }
 
-    // UserViewModelFactoryのインスタンス (lazy初期化)
-    val userViewModelFactory by lazy { UserViewModelFactory(userRepository) }
+    // UserViewModelのファクトリ (provideFactoryメソッドを使用)
+    // ★ 型を ViewModelProvider.Factory にする
+    val userViewModelFactory: ViewModelProvider.Factory by lazy {
+        // ★ UserViewModel の companion object のメソッドを呼び出す
+        UserViewModel.provideFactory(userRepository)
+    }
 
     companion object {
         private const val TAG = "CatQuestApp_Lifecycle"

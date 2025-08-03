@@ -303,18 +303,29 @@ fun BreedSelectionScreen(
             Button(
                 onClick = {
                     if (pagerState.currentPage < breeds.size) {
-                        val selectedBreed = breeds[pagerState.currentPage] // BreedDisplayData を取得
+                        val selectedBreed = breeds[pagerState.currentPage]
                         Log.d(
                             "BreedSelection",
                             "${selectedBreed.name} (ID: ${selectedBreed.id}) が選択されました"
                         )
 
-                        // ★ UserViewModel を使って血統を更新
-                        userViewModel.selectBreedAndUpdateUser(selectedBreed.name)
+                        // ★★★ エラー箇所 ★★★
+                        // userViewModel.selectBreedAndUpdateUser(selectedBreed.name) // onResultが渡されていない
+                        // ★★★ 修正案は以下 ★★★
+                        userViewModel.selectBreedAndUpdateUser(selectedBreed.name) { success ->
+                            if (success) {
+                                Log.d("BreedSelectionScreen", "Breed update successful for ${selectedBreed.name}")
+                                // ★ 血統選択成功後、次の画面へ遷移
+                                onNavigateToNextScreen()
+                            } else {
+                                Log.e("BreedSelectionScreen", "Breed update FAILED for ${selectedBreed.name}")
+                                // ここでユーザーにエラーを通知する処理（例: Toast、Snackbar、ダイアログ）を検討
+                            }
+                        }
                         // onBreedSelected(selectedBreed.name) // 古いコールバックは削除またはViewModel経由に置き換え
 
-                        // ★ 血統選択後、次の画面へ遷移
-                        onNavigateToNextScreen()
+                        // ★ onNavigateToNextScreen() はコールバック内に移動
+                        // onNavigateToNextScreen()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(0.8f)
