@@ -70,13 +70,13 @@ data class PlayerCharacterState(
 )
 
 data class EnemyCharacterState(
-    val name: String = "スライム",
+    val name: String = "大化け猫",
     var currentHp: Int = 30,
     val maxHp: Int = 30,
     val attackPower: Int = 5,
     val experiencePoint: Int = 10,     // ★追加: 倒した時の獲得経験値
     // val gold: Int = 5,              // ★追加例: 倒した時の獲得ゴールド
-    val imageResId: Int = R.drawable.ic_enemy_slime_placeholder // プレースホルダー画像
+    val imageResId: Int = R.drawable.bakeneko_img // プレースホルダー画像
 )
 
 data class CombatScreenUiState(
@@ -118,7 +118,7 @@ class CombatViewModel : ViewModel() {
             attackPower = 12
         )
         val initialEnemy =
-            EnemyCharacterState(name = "ゴブリン", maxHp = 40, currentHp = 40, attackPower = 8)
+            EnemyCharacterState(name = "大化け猫", maxHp = 40, currentHp = 40, attackPower = 8)
 
         messageLogInternal.clear()
         messageLogInternal.add("${initialEnemy.name}があらわれた！")

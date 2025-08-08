@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.sawag.catquestapp" />
+                  <option name="mobileSdkAppId" value="1:910951864617:android:d0fdd40d201a9269047f38" />
+                  <option name="projectId" value="catquest-2e6fc" />
+                  <option name="projectNumber" value="910951864617" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
