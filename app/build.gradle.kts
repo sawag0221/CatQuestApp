@@ -12,9 +12,7 @@ plugins {
 
 //    id("com.google.devtools.ksp") // ★ これが必要
 
-//    id("com.android.application")
 
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -101,20 +99,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation("com.google.code.gson:gson:2.13.1") // 最新バージョンを確認してください
-
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
-
-
-    // TODO: Add the dependencies for Firebase products you want to use
-    // When using the BoM, don't specify versions in Firebase dependencies
-    implementation("com.google.firebase:firebase-analytics")
-
-    implementation("com.google.firebase:firebase-auth-ktx")
-
-
-    // Add the dependencies for any other desired Firebase products
-    // https://firebase.google.com/docs/android/setup#available-libraries
 }
 kotlin
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
